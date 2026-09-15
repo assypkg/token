@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Kelola Token Akses</title>
+    
+    <!-- Firebase SDK Modular CDN -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCi7Tr4DDGvWg-a8Fd_tybUS7bBq0hrvaY",
+            authDomain: "summarypengiriman.firebaseapp.com",
+            projectId: "summarypengiriman",
+            storageBucket: "summarypengiriman.firebasestorage.app",
+            messagingSenderId: "726489838703",
+            appId: "1:726489838703:web:928fb059ecf661c44a499a",
+            measurementId: "G-V2H2FVXDYY"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        window.db = db;
+        window.fbModules = { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy };
+        
+        loadTokens();
+    </script>
+
+    <style>
+        :root {
+            --primary: #203764;
+            --success: #27ae60;
+            --danger: #e74c3c;
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+            --border-color: #dcdde1;
+            --text-main: #2f3640;
+        }
+
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-color); color: var(--text-main); padding: 15px; margin: 0; }
+        .container { max-width: 600px; margin: 0 auto; background: var(--card-bg); padding: 20px; border-radius: 10px; box-shadow: 0 4px 12px rgba(32,55,100,0.08); }
+        h2 { color: var(--primary); border-bottom: 2px solid var(--primary); padding-bottom: 8px; margin-top: 0; font-size: 18px; }
+        .form-group { margin-bottom: 12px; }
+        label { display: block; font-size: 11px; font-weight: bold; color: #718093; text-transform: uppercase; margin-bottom: 4px; }
+        input, select { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 13px; box-sizing: border-box; }
+        .btn { background: var(--primary); color: white; border: none; padding: 10px 15px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; width: 100%; }
+        .btn:hover { background: #15264a; }
+        
+        .token-list { margin-top: 20px; display: flex; flex-direction: column; gap: 8px; }
+        .token-item { background: #f8fafc; border: 1px solid var(--border-color); padding: 10px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+        .badge-active { color: var(--success); font-weight: bold; }
+        .badge-inactive { color: var(--danger); font-weight: bold; }
+        .btn-sm { padding: 4px 8px; font-size: 11px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; }
+        .btn-toggle { background: #f39c12; color: white; }
+        .btn-del { background: var(--danger); color: white; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>🔑 Generator & Manajemen Token Kabag</h2>
+        
+        <div class="form-group" style="margin-top: 15px;">
+            <label>Nama Pemegang / Keterangan (Contoh: Kabag Shift 2)</label>
+            <input type="text" id="inputNama" placeholder="Masukkan nama pemegang token...">
+        </div>
+        <div class="form-group">
+            <label>Kode Token Unik (Contoh: KABAG-SHIFT2-OK)</label>
+            <input type="text" id="inputToken" placeholder="Ketik kode token unik..." style="text-transform: uppercase; font-weight: bold;">
+        </div>
+        <button class="btn" onclick="addNewToken()">+ Simpan & Buat Token Baru</button>
+
+        <h3 style="margin-top: 25px; color: var(--primary); font-size: 15px;">Daftar Token Aktif / Terdaftar</h3>
+        <div id="tokenContainer" class="token-list">
+            <div style="text-align: center; color: #718093; font-style: italic;">Memuat data token...</div>
+        </div>
+    </div>
+
+    <script>
+        async function loadTokens() {
+            const { collection, getDocs, query, orderBy } = window.fbModules;
+            let container = document.getElementById('tokenContainer');
+            container.innerHTML = `<div style="text-align: center; color: #718093; font-style: italic;">Memuat data token...</div>`;
+
+            try {
+                const q = query(collection(window.db, "access_tokens"));
+                const querySnapshot = await getDocs(q);
+                
+                container.innerHTML = '';
+                if (querySnapshot.empty) {
+                    container.innerHTML = `<div style="text-align: center; color: #718093; font-style: italic;">Belum ada token yang dibuat.</div>`;
+                    return;
+                }
+
+                querySnapshot.forEach((docSnap) => {
+                    let data = docSnap.data();
+                    let docId = docSnap.id;
+                    let statusBadge = data.active ? `<span class="badge-active">AKTIF</span>` : `<span class="badge-inactive">NONAKTIF</span>`;
+                    let toggleText = data.active ? 'Matikan' : 'Aktifkan';
+
+                    let itemDiv = document.createElement('div');
+                    itemDiv.className = 'token-item';
+                    itemDiv.innerHTML = `
+                        <div>
+                            <strong>${data.nama}</strong><br>
+                            <code style="background: #e2e8f0; padding: 2px 4px; border-radius: 3px; font-weight: bold; color: var(--primary);">${data.token}</code>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            ${statusBadge}
+                            <button class="btn-sm btn-toggle" onclick="toggleTokenStatus('${docId}', ${data.active})">${toggleText}</button>
+                            <button class="btn-sm btn-del" onclick="deleteToken('${docId}')">Hapus</button>
+                        </div>
+                    `;
+                    container.appendChild(itemDiv);
+                });
+            } catch (e) {
+                console.error(e);
+                container.innerHTML = `<div style="text-align: center; color: var(--danger);">Gagal memuat token dari database.</div>`;
+            }
+        }
+
+        async function addNewToken() {
+            let nama = document.getElementById('inputNama').value.trim();
+            let token = document.getElementById('inputToken').value.trim().toUpperCase();
+
+            if (!nama || !token) {
+                alert("Nama dan Kode Token wajib diisi!");
+                return;
+            }
+
+            try {
+                const { collection, addDoc } = window.fbModules;
+                await addDoc(collection(window.db, "access_tokens"), {
+                    nama: nama,
+                    token: token,
+                    active: true,
+                    createdAt: new Date().toISOString()
+                });
+
+                document.getElementById('inputNama').value = '';
+                document.getElementById('inputToken').value = '';
+                alert("Token berhasil dibuat dan langsung aktif!");
+                loadTokens();
+            } catch (e) {
+                console.error(e);
+                alert("Gagal menyimpan token.");
+            }
+        }
+
+        async function toggleTokenStatus(docId, currentStatus) {
+            try {
+                const { doc, updateDoc } = window.fbModules;
+                let tokenRef = doc(window.db, "access_tokens", docId);
+                await updateDoc(tokenRef, { active: !currentStatus });
+                loadTokens();
+            } catch (e) {
+                console.error(e);
+                alert("Gagal mengubah status token.");
+            }
+        }
+
+        async function deleteToken(docId) {
+            if (!confirm("Yakin ingin menghapus token ini permanen?")) return;
+            try {
+                const { doc, deleteDoc } = window.fbModules;
+                await deleteDoc(doc(window.db, "access_tokens", docId));
+                loadTokens();
+            } catch (e) {
+                console.error(e);
+                alert("Gagal menghapus token.");
+            }
+        }
+    </script>
+</body>
+</html>
