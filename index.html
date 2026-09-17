@@ -8,7 +8,7 @@
     <!-- Firebase SDK Modular CDN -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCi7Tr4DDGvWg-a8Fd_tybUS7bBq0hrvaY",
@@ -16,15 +16,14 @@
             projectId: "summarypengiriman",
             storageBucket: "summarypengiriman.firebasestorage.app",
             messagingSenderId: "726489838703",
-            appId: "1:726489838703:web:928fb059ecf661c44a499a",
-            measurementId: "G-V2H2FVXDYY"
+            appId: "1:726489838703:web:928fb059ecf661c44a499a"
         };
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
         window.db = db;
-        window.fbModules = { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy };
+        window.fbModules = { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query };
         
         loadTokens();
     </script>
@@ -34,6 +33,8 @@
             --primary: #203764;
             --success: #27ae60;
             --danger: #e74c3c;
+            --warning: #f39c12;
+            --info: #3498db;
             --bg-color: #f4f7f6;
             --card-bg: #ffffff;
             --border-color: #dcdde1;
@@ -41,49 +42,267 @@
         }
 
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-color); color: var(--text-main); padding: 15px; margin: 0; }
-        .container { max-width: 600px; margin: 0 auto; background: var(--card-bg); padding: 20px; border-radius: 10px; box-shadow: 0 4px 12px rgba(32,55,100,0.08); }
-        h2 { color: var(--primary); border-bottom: 2px solid var(--primary); padding-bottom: 8px; margin-top: 0; font-size: 18px; }
-        .form-group { margin-bottom: 12px; }
+        .container { max-width: 700px; margin: 0 auto; background: var(--card-bg); padding: 20px; border-radius: 10px; box-shadow: 0 4px 12px rgba(32,55,100,0.08); }
+        h2, h3 { color: var(--primary); border-bottom: 2px solid var(--primary); padding-bottom: 8px; margin-top: 0; font-size: 16px; }
+        
+        .form-row { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; }
+        .form-group { flex: 1; }
         label { display: block; font-size: 11px; font-weight: bold; color: #718093; text-transform: uppercase; margin-bottom: 4px; }
         input, select { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 13px; box-sizing: border-box; }
+        
         .btn { background: var(--primary); color: white; border: none; padding: 10px 15px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; width: 100%; }
         .btn:hover { background: #15264a; }
         
-        .token-list { margin-top: 20px; display: flex; flex-direction: column; gap: 8px; }
-        .token-item { background: #f8fafc; border: 1px solid var(--border-color); padding: 10px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+        /* Schedule Box */
+        .schedule-box { background: #f8fafc; border: 1px solid var(--primary); border-radius: 8px; padding: 15px; margin-bottom: 15px; display: none; }
+        .schedule-box.active { display: block; }
+        .schedule-header { font-size: 12px; font-weight: bold; color: var(--primary); margin-bottom: 10px; display: flex; justify-content: space-between; border-bottom: 1px solid #dcdde1; padding-bottom: 5px;}
+        
+        .toggle-container { display: flex; align-items: center; gap: 8px; margin-bottom: 15px; font-size: 13px; font-weight: bold; color: var(--primary); }
+        .toggle-switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--success); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        /* Tokens List */
+        .token-list { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
+        .token-item { background: #f8fafc; border: 1px solid var(--border-color); padding: 12px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
         .badge-active { color: var(--success); font-weight: bold; }
         .badge-inactive { color: var(--danger); font-weight: bold; }
-        .btn-sm { padding: 4px 8px; font-size: 11px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; }
-        .btn-toggle { background: #f39c12; color: white; }
-        .btn-del { background: var(--danger); color: white; }
+        .btn-group { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; width: 250px;}
+        .btn-sm { padding: 5px 8px; font-size: 11px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; color: white; }
+        .btn-toggle { background: var(--warning); }
+        .btn-info { background: var(--info); }
+        .btn-edit { background: #8e44ad; }
+        .btn-del { background: var(--danger); }
+
+        /* Modals */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; padding: 15px; box-sizing: border-box; }
+        .modal-content { background: white; padding: 20px; border-radius: 8px; width: 100%; max-width: 400px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .modal-content h3 { margin-top: 0; border-bottom: none; color: var(--primary); font-size: 15px; }
+        .day-checkboxes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
+        .day-checkboxes label { font-size: 12px; font-weight: normal; color: var(--text-main); display: flex; align-items: center; gap: 5px; text-transform: none; }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 15px; }
+        .btn-cancel { background: #95a5a6; color: white; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h2>🔑 Generator & Manajemen Token Kabag</h2>
+        <h2>Generator & Manajemen Token Akses</h2>
         
-        <div class="form-group" style="margin-top: 15px;">
-            <label>Nama Pemegang / Keterangan (Contoh: Kabag Shift 2)</label>
-            <input type="text" id="inputNama" placeholder="Masukkan nama pemegang token...">
+        <div class="form-row">
+            <div class="form-group" style="flex: 2;">
+                <label>Nama / Keterangan</label>
+                <input type="text" id="inputNama" placeholder="Contoh: Kabag Shift 1">
+            </div>
+            <div class="form-group" style="flex: 2;">
+                <label>Kode Token Unik</label>
+                <input type="text" id="inputToken" placeholder="KABAG-SHIFT1" style="text-transform: uppercase; font-weight: bold;">
+            </div>
+            <div class="form-group" style="flex: 1;">
+                <label>Batas HP</label>
+                <input type="number" id="inputMaxDevices" value="1" min="1">
+            </div>
         </div>
-        <div class="form-group">
-            <label>Kode Token Unik (Contoh: KABAG-SHIFT2-OK)</label>
-            <input type="text" id="inputToken" placeholder="Ketik kode token unik..." style="text-transform: uppercase; font-weight: bold;">
-        </div>
-        <button class="btn" onclick="addNewToken()">+ Simpan & Buat Token Baru</button>
 
-        <h3 style="margin-top: 25px; color: var(--primary); font-size: 15px;">Daftar Token Aktif / Terdaftar</h3>
-        <div id="tokenContainer" class="token-list">
-            <div style="text-align: center; color: #718093; font-style: italic;">Memuat data token...</div>
+        <div class="toggle-container">
+            <label class="toggle-switch">
+                <input type="checkbox" id="toggleSchedule" onchange="toggleScheduleUI('scheduleContainer', this.checked)">
+                <span class="slider"></span>
+            </label>
+            Gunakan Jadwal Otomatis (Waktu Hidup & Mati)
+        </div>
+
+        <div id="scheduleContainer" class="schedule-box">
+            <!-- Waktu Hidup -->
+            <div class="schedule-header">JADWAL TOKEN HIDUP</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Waktu Mulai (24 Jam)</label>
+                    <input type="time" id="start-time" value="08:00">
+                </div>
+                <div class="form-group">
+                    <label>Hari Aktif</label>
+                    <select id="start-day" onchange="handleDaySelect(this, 'start')">
+                        <option value="tiap_hari">Tiap Hari</option>
+                        <option value="senin_jumat">Senin sampai Jumat</option>
+                        <option value="sekali">Sekali (Hari Ini Saja)</option>
+                        <option value="khusus">Khusus (Pilih Hari)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Waktu Mati -->
+            <div class="schedule-header" style="margin-top: 10px;">JADWAL TOKEN MATI</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Waktu Berakhir (24 Jam)</label>
+                    <input type="time" id="end-time" value="16:00">
+                </div>
+                <div class="form-group">
+                    <label>Hari Berakhir</label>
+                    <select id="end-day" onchange="handleDaySelect(this, 'end')">
+                        <option value="tiap_hari">Tiap Hari</option>
+                        <option value="senin_jumat">Senin sampai Jumat</option>
+                        <option value="sekali">Sekali (Hari Ini Saja)</option>
+                        <option value="khusus">Khusus (Pilih Hari)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <button class="btn" onclick="saveToken()">+ Simpan & Terapkan</button>
+
+        <h3 style="margin-top: 25px;">Daftar Token Terdaftar</h3>
+        <div id="tokenContainer" class="token-list"></div>
+    </div>
+
+    <!-- Modal Pop-Up Hari Khusus -->
+    <div id="modalDays" class="modal-overlay">
+        <div class="modal-content">
+            <h3 id="modalDaysTitle">Pilih Hari Khusus</h3>
+            <div class="day-checkboxes">
+                <label><input type="checkbox" value="1" class="chk-day"> Senin</label>
+                <label><input type="checkbox" value="2" class="chk-day"> Selasa</label>
+                <label><input type="checkbox" value="3" class="chk-day"> Rabu</label>
+                <label><input type="checkbox" value="4" class="chk-day"> Kamis</label>
+                <label><input type="checkbox" value="5" class="chk-day"> Jumat</label>
+                <label><input type="checkbox" value="6" class="chk-day"> Sabtu</label>
+                <label><input type="checkbox" value="0" class="chk-day"> Minggu</label>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-sm btn-cancel" onclick="closeModalDays(false)">Batal</button>
+                <button class="btn-sm btn-info" onclick="closeModalDays(true)">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Edit Token -->
+    <div id="modalEdit" class="modal-overlay">
+        <div class="modal-content" style="max-width: 550px;">
+            <h3>Edit Pengaturan Token</h3>
+            <input type="hidden" id="edit-docId">
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Batas Perangkat</label>
+                <input type="number" id="edit-maxDevices" min="1">
+            </div>
+            
+            <div class="toggle-container" style="margin-top:15px;">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="edit-toggleSchedule" onchange="toggleScheduleUI('edit-scheduleContainer', this.checked)">
+                    <span class="slider"></span>
+                </label>
+                Gunakan Jadwal Otomatis
+            </div>
+
+            <div id="edit-scheduleContainer" class="schedule-box">
+                <div class="form-row">
+                    <div class="form-group"><label>Mulai</label><input type="time" id="edit-start-time"></div>
+                    <div class="form-group">
+                        <label>Hari Mulai</label>
+                        <select id="edit-start-day" onchange="handleDaySelect(this, 'edit-start')">
+                            <option value="tiap_hari">Tiap Hari</option><option value="senin_jumat">Senin sampai Jumat</option><option value="sekali">Sekali (Hari Ini Saja)</option><option value="khusus">Khusus</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Mati</label><input type="time" id="edit-end-time"></div>
+                    <div class="form-group">
+                        <label>Hari Mati</label>
+                        <select id="edit-end-day" onchange="handleDaySelect(this, 'edit-end')">
+                            <option value="tiap_hari">Tiap Hari</option><option value="senin_jumat">Senin sampai Jumat</option><option value="sekali">Sekali (Hari Ini Saja)</option><option value="khusus">Khusus</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-sm btn-cancel" style="padding: 8px 15px;" onclick="document.getElementById('modalEdit').style.display='none'">Batal</button>
+                <button class="btn-sm btn-info" style="padding: 8px 15px;" onclick="updateTokenData()">Simpan Perubahan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Lihat Perangkat Terhubung -->
+    <div id="modalDevices" class="modal-overlay">
+        <div class="modal-content" style="max-width: 420px;">
+            <h3>Daftar Perangkat Terhubung</h3>
+            <div id="deviceModalBody" style="max-height: 220px; overflow-y: auto; margin: 15px 0; font-size: 12px;">
+                <!-- Daftar perangkat akan dimuat secara dinamis di sini -->
+            </div>
+            <div class="modal-actions">
+                <button class="btn" style="width: auto; padding: 8px 20px;" onclick="document.getElementById('modalDevices').style.display='none'">Tutup</button>
+            </div>
         </div>
     </div>
 
     <script>
+        let customDaysData = { 'start': [], 'end': [], 'edit-start': [], 'edit-end': [] };
+        let activeDayContext = ''; 
+        let activeSelectElement = null;
+
+        function toggleScheduleUI(containerId, isChecked) {
+            document.getElementById(containerId).className = isChecked ? 'schedule-box active' : 'schedule-box';
+        }
+
+        function handleDaySelect(selectElement, context) {
+            if (selectElement.value === 'khusus') {
+                activeDayContext = context;
+                activeSelectElement = selectElement;
+                
+                let savedDays = customDaysData[context] || [];
+                document.querySelectorAll('.chk-day').forEach(chk => {
+                    chk.checked = savedDays.includes(parseInt(chk.value));
+                });
+                
+                document.getElementById('modalDaysTitle').innerText = `Pilih Hari Khusus (${context.includes('start') ? 'Mulai' : 'Mati'})`;
+                document.getElementById('modalDays').style.display = 'flex';
+            }
+        }
+
+        function closeModalDays(isSave) {
+            if (isSave) {
+                let selected = [];
+                document.querySelectorAll('.chk-day:checked').forEach(chk => selected.push(parseInt(chk.value)));
+                if (selected.length === 0) {
+                    alert("Minimal pilih 1 hari!");
+                    return;
+                }
+                customDaysData[activeDayContext] = selected;
+            } else {
+                if (activeSelectElement && (!customDaysData[activeDayContext] || customDaysData[activeDayContext].length === 0)) {
+                    activeSelectElement.value = 'tiap_hari';
+                }
+            }
+            document.getElementById('modalDays').style.display = 'none';
+        }
+
+        function buildScheduleObject(prefix = '') {
+            let toggle = document.getElementById(prefix ? 'edit-toggleSchedule' : 'toggleSchedule').checked;
+            if (!toggle) return { isScheduled: false };
+            
+            return {
+                isScheduled: true,
+                createdAt: new Date().toISOString(),
+                start: {
+                    time: document.getElementById(prefix + 'start-time').value,
+                    type: document.getElementById(prefix + 'start-day').value,
+                    days: customDaysData[prefix ? 'edit-start' : 'start'] || []
+                },
+                end: {
+                    time: document.getElementById(prefix + 'end-time').value,
+                    type: document.getElementById(prefix + 'end-day').value,
+                    days: customDaysData[prefix ? 'edit-end' : 'end'] || []
+                }
+            };
+        }
+
         async function loadTokens() {
-            const { collection, getDocs, query, orderBy } = window.fbModules;
+            const { collection, getDocs, query } = window.fbModules;
             let container = document.getElementById('tokenContainer');
-            container.innerHTML = `<div style="text-align: center; color: #718093; font-style: italic;">Memuat data token...</div>`;
+            container.innerHTML = `<div style="text-align: center; font-style: italic; color: #718093;">Memuat data...</div>`;
 
             try {
                 const q = query(collection(window.db, "access_tokens"));
@@ -91,45 +310,75 @@
                 
                 container.innerHTML = '';
                 if (querySnapshot.empty) {
-                    container.innerHTML = `<div style="text-align: center; color: #718093; font-style: italic;">Belum ada token yang dibuat.</div>`;
+                    container.innerHTML = `<div style="text-align: center; color: #718093; font-style: italic;">Belum ada token.</div>`;
                     return;
                 }
 
                 querySnapshot.forEach((docSnap) => {
                     let data = docSnap.data();
                     let docId = docSnap.id;
-                    let statusBadge = data.active ? `<span class="badge-active">AKTIF</span>` : `<span class="badge-inactive">NONAKTIF</span>`;
-                    let toggleText = data.active ? 'Matikan' : 'Aktifkan';
+                    let registered = data.registeredDevices || [];
+                    let maxDev = data.maxDevices || 1;
+                    
+                    let scheduleText = "Tanpa Jadwal (Bebas)";
+                    if (data.schedule && data.schedule.isScheduled) {
+                        scheduleText = `Aktif: ${data.schedule.start.time} - ${data.schedule.end.time} (${data.schedule.start.type})`;
+                    }
 
+                    let statusBadge = data.active ? `<span class="badge-active">AKTIF</span>` : `<span class="badge-inactive">NONAKTIF</span>`;
                     let itemDiv = document.createElement('div');
                     itemDiv.className = 'token-item';
+                    
+                    let rawData = encodeURIComponent(JSON.stringify(data));
+                    let devicesJson = encodeURIComponent(JSON.stringify(registered));
+
                     itemDiv.innerHTML = `
-                        <div>
-                            <strong>${data.nama}</strong><br>
-                            <code style="background: #e2e8f0; padding: 2px 4px; border-radius: 3px; font-weight: bold; color: var(--primary);">${data.token}</code>
+                        <div style="display:flex; flex-direction:column; gap:4px;">
+                            <strong>${data.nama}</strong>
+                            <code style="background: #e2e8f0; padding: 2px 5px; border-radius: 3px; font-weight: bold; color: var(--primary); width: fit-content;">${data.token}</code>
+                            <div style="font-size: 10px; color: #7f8c8d;">Terhubung: ${registered.length} / ${maxDev} Perangkat</div>
+                            <div style="font-size: 10px; color: var(--info); font-weight:bold;">⏱️ ${scheduleText}</div>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 8px;">
+                        <div class="btn-group">
                             ${statusBadge}
-                            <button class="btn-sm btn-toggle" onclick="toggleTokenStatus('${docId}', ${data.active})">${toggleText}</button>
+                            <button class="btn-sm btn-info" onclick="viewDevices('${devicesJson}')">Lihat</button>
+                            <button class="btn-sm btn-toggle" onclick="resetDevices('${docId}')">Reset</button>
+                            <button class="btn-sm btn-edit" onclick="openEditModal('${docId}', '${rawData}')">Edit</button>
+                            <button class="btn-sm btn-info" onclick="toggleTokenStatus('${docId}', ${data.active})">${data.active ? 'Matikan' : 'Nyalakan'}</button>
                             <button class="btn-sm btn-del" onclick="deleteToken('${docId}')">Hapus</button>
                         </div>
                     `;
                     container.appendChild(itemDiv);
                 });
-            } catch (e) {
-                console.error(e);
-                container.innerHTML = `<div style="text-align: center; color: var(--danger);">Gagal memuat token dari database.</div>`;
-            }
+            } catch (e) { console.error(e); }
         }
 
-        async function addNewToken() {
+        window.viewDevices = function(devicesJson) {
+            let devices = JSON.parse(decodeURIComponent(devicesJson));
+            let bodyDiv = document.getElementById('deviceModalBody');
+            bodyDiv.innerHTML = '';
+            
+            if (devices.length === 0) {
+                bodyDiv.innerHTML = `<div style="text-align: center; color: #718093; font-style: italic; padding: 15px;">Belum ada perangkat yang terhubung ke token ini.</div>`;
+            } else {
+                let listHtml = '<ul style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px;">';
+                devices.forEach((id) => {
+                    listHtml += `<li><code style="background: #e2e8f0; padding: 3px 6px; border-radius: 3px; font-weight: bold; color: var(--primary);">${id}</code></li>`;
+                });
+                listHtml += '</ul>';
+                bodyDiv.innerHTML = listHtml;
+            }
+            document.getElementById('modalDevices').style.display = 'flex';
+        }
+
+        window.saveToken = async function() {
             let nama = document.getElementById('inputNama').value.trim();
             let token = document.getElementById('inputToken').value.trim().toUpperCase();
+            let maxDevices = parseInt(document.getElementById('inputMaxDevices').value) || 1;
 
-            if (!nama || !token) {
-                alert("Nama dan Kode Token wajib diisi!");
-                return;
-            }
+            if (!nama || !token) { alert("Nama dan Kode wajib diisi!"); return; }
+
+            let schedule = buildScheduleObject();
 
             try {
                 const { collection, addDoc } = window.fbModules;
@@ -137,41 +386,70 @@
                     nama: nama,
                     token: token,
                     active: true,
-                    createdAt: new Date().toISOString()
+                    maxDevices: maxDevices,
+                    registeredDevices: [],
+                    schedule: schedule
                 });
-
-                document.getElementById('inputNama').value = '';
-                document.getElementById('inputToken').value = '';
-                alert("Token berhasil dibuat dan langsung aktif!");
-                loadTokens();
-            } catch (e) {
-                console.error(e);
-                alert("Gagal menyimpan token.");
-            }
+                alert("Token berhasil dibuat!");
+                location.reload();
+            } catch (e) { alert("Gagal menyimpan."); }
         }
 
-        async function toggleTokenStatus(docId, currentStatus) {
+        window.openEditModal = function(docId, rawData) {
+            let data = JSON.parse(decodeURIComponent(rawData));
+            document.getElementById('edit-docId').value = docId;
+            document.getElementById('edit-maxDevices').value = data.maxDevices || 1;
+            
+            let isSched = data.schedule && data.schedule.isScheduled;
+            document.getElementById('edit-toggleSchedule').checked = isSched;
+            toggleScheduleUI('edit-scheduleContainer', isSched);
+
+            if (isSched) {
+                document.getElementById('edit-start-time').value = data.schedule.start.time;
+                document.getElementById('edit-start-day').value = data.schedule.start.type;
+                customDaysData['edit-start'] = data.schedule.start.days || [];
+                
+                document.getElementById('edit-end-time').value = data.schedule.end.time;
+                document.getElementById('edit-end-day').value = data.schedule.end.type;
+                customDaysData['edit-end'] = data.schedule.end.days || [];
+            }
+            document.getElementById('modalEdit').style.display = 'flex';
+        }
+
+        window.updateTokenData = async function() {
+            let docId = document.getElementById('edit-docId').value;
+            let maxDevices = parseInt(document.getElementById('edit-maxDevices').value) || 1;
+            let schedule = buildScheduleObject('edit-');
+
             try {
                 const { doc, updateDoc } = window.fbModules;
-                let tokenRef = doc(window.db, "access_tokens", docId);
-                await updateDoc(tokenRef, { active: !currentStatus });
+                await updateDoc(doc(window.db, "access_tokens", docId), {
+                    maxDevices: maxDevices,
+                    schedule: schedule
+                });
+                document.getElementById('modalEdit').style.display = 'none';
                 loadTokens();
-            } catch (e) {
-                console.error(e);
-                alert("Gagal mengubah status token.");
-            }
+            } catch (e) { alert("Gagal update."); }
         }
 
-        async function deleteToken(docId) {
-            if (!confirm("Yakin ingin menghapus token ini permanen?")) return;
-            try {
-                const { doc, deleteDoc } = window.fbModules;
-                await deleteDoc(doc(window.db, "access_tokens", docId));
-                loadTokens();
-            } catch (e) {
-                console.error(e);
-                alert("Gagal menghapus token.");
-            }
+        window.toggleTokenStatus = async function(docId, currentStatus) {
+            const { doc, updateDoc } = window.fbModules;
+            await updateDoc(doc(window.db, "access_tokens", docId), { active: !currentStatus });
+            loadTokens();
+        }
+
+        window.resetDevices = async function(docId) {
+            if(!confirm("Keluarkan semua perangkat dari token ini?")) return;
+            const { doc, updateDoc } = window.fbModules;
+            await updateDoc(doc(window.db, "access_tokens", docId), { registeredDevices: [] });
+            loadTokens();
+        }
+
+        window.deleteToken = async function(docId) {
+            if(!confirm("Hapus permanen?")) return;
+            const { doc, deleteDoc } = window.fbModules;
+            await deleteDoc(doc(window.db, "access_tokens", docId));
+            loadTokens();
         }
     </script>
 </body>
