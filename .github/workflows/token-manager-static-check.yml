@@ -58,7 +58,7 @@ jobs:
               raise SystemExit(f"Password login guard unexpected: HTTP {status}; body={body[:300]}")
 
           status, _, body = request(payload={"action": "list"}, bearer="invalid-smoke-test-session")
-          if status != 401 or "Sesi berakhir atau tidak valid." not in body:
+          if status != 401 or "Password salah atau sesi tidak valid." not in body:
               raise SystemExit(f"Session validation unexpected: HTTP {status}; body={body[:300]}")
 
           print("CORS preflight passed.")
