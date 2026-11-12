@@ -18,6 +18,66 @@ jobs:
         with:
           node-version: 22
 
+      - name: Smoke test deployed Supabase endpoints (read-only)
+        env:
+          SUPABASE_URL: https://wcsjjdzxnwhzqkqninky.supabase.co
+          SUPABASE_ANON_KEY: sb_publishable_UadEwYUBc9Whu3m7VKrF6g_lAjS_Y4U
+          EXPECTED_ORIGIN: https://assypkg.github.io
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+
+          base = os.environ["SUPABASE_URL"].rstrip("/") + "/functions/v1/"
+          public_key = os.environ["SUPABASE_ANON_KEY"]
+          origin = os.environ["EXPECTED_ORIGIN"]
+
+          def request(path, method="POST", payload=None, bearer=None):
+              headers = {
+                  "apikey": public_key,
+                  "Origin": origin,
+                  "Content-Type": "application/json",
+              }
+              if bearer:
+                  headers["Authorization"] = "Bearer " + bearer
+              data = None if payload is None else json.dumps(payload).encode()
+              req = urllib.request.Request(base + path, data=data, headers=headers, method=method)
+              try:
+                  with urllib.request.urlopen(req, timeout=20) as response:
+                      return response.status, response.headers, response.read().decode()
+              except urllib.error.HTTPError as error:
+                  return error.code, error.headers, error.read().decode()
+
+          for endpoint in ("username-login", "token-manager-api"):
+              status, headers, _ = request(
+                  endpoint, "OPTIONS",
+                  payload=None
+              )
+              if status != 200 or headers.get("Access-Control-Allow-Origin") != origin:
+                  raise SystemExit(f"CORS preflight failed for {endpoint}: HTTP {status}")
+
+          status, _, body = request(
+              "username-login",
+              payload={"username": "__healthcheck__", "password": "Invalid-Healthcheck-Password"},
+          )
+          if status != 401 or "Username atau password salah." not in body:
+              raise SystemExit(f"Login endpoint smoke test unexpected: HTTP {status}; body={body[:300]}")
+
+          status, _, body = request(
+              "token-manager-api",
+              payload={"action": "list"},
+              bearer="invalid-smoke-test-session",
+          )
+          if status != 401 or "Sesi login tidak valid" not in body:
+              raise SystemExit(f"Token API auth guard smoke test unexpected: HTTP {status}; body={body[:300]}")
+
+          print("CORS preflight passed for both endpoints.")
+          print("Username login endpoint responds with expected invalid-credential rejection.")
+          print("Token Manager API rejects an invalid bearer session.")
+          PY
+
       - name: Validate inline JavaScript and integration safeguards
         shell: bash
         run: |
