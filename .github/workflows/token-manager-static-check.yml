@@ -1,0 +1,146 @@
+name: Token Manager Static Check
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [supabase-auth-integration]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Smoke test internal-password backend (read-only)
+        env:
+          SUPABASE_URL: https://wcsjjdzxnwhzqkqninky.supabase.co
+          SUPABASE_ANON_KEY: sb_publishable_UadEwYUBc9Whu3m7VKrF6g_lAjS_Y4U
+          EXPECTED_ORIGIN: https://assypkg.github.io
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+
+          base = os.environ["SUPABASE_URL"].rstrip("/") + "/functions/v1/token-manager-api"
+          headers = {
+              "apikey": os.environ["SUPABASE_ANON_KEY"],
+              "Origin": os.environ["EXPECTED_ORIGIN"],
+              "Content-Type": "application/json",
+          }
+
+          def request(payload=None, bearer=None, method="POST"):
+              h = dict(headers)
+              if bearer:
+                  h["Authorization"] = "Bearer " + bearer
+              data = None if payload is None else json.dumps(payload).encode()
+              req = urllib.request.Request(base, data=data, headers=h, method=method)
+              try:
+                  with urllib.request.urlopen(req, timeout=20) as response:
+                      return response.status, response.headers, response.read().decode()
+              except urllib.error.HTTPError as error:
+                  return error.code, error.headers, error.read().decode()
+
+          status, response_headers, _ = request(method="OPTIONS")
+          if status != 200 or response_headers.get("Access-Control-Allow-Origin") != headers["Origin"]:
+              raise SystemExit(f"CORS preflight failed: HTTP {status}")
+
+          status, _, body = request(payload={"action": "login", "password": "invalid-health-check-password"})
+          if status != 401 or "Password salah." not in body:
+              raise SystemExit(f"Password login guard unexpected: HTTP {status}; body={body[:300]}")
+
+          status, _, body = request(payload={"action": "list"}, bearer="invalid-smoke-test-session")
+          if status != 401 or "Password salah atau sesi tidak valid." not in body:
+              raise SystemExit(f"Session validation unexpected: HTTP {status}; body={body[:300]}")
+
+          print("CORS preflight passed.")
+          print("Invalid internal password is rejected.")
+          print("Invalid session token is rejected.")
+          PY
+
+      - name: Validate inline JavaScript and integration safeguards
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+
+          class ScriptExtractor(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.in_script = False
+                  self.current = []
+                  self.scripts = []
+                  self.ids = []
+
+              def handle_starttag(self, tag, attrs):
+                  attrs = dict(attrs)
+                  if "id" in attrs:
+                      self.ids.append(attrs["id"])
+                  if tag == "script" and not attrs.get("src"):
+                      self.in_script = True
+                      self.current = []
+
+              def handle_data(self, data):
+                  if self.in_script:
+                      self.current.append(data)
+
+              def handle_endtag(self, tag):
+                  if tag == "script" and self.in_script:
+                      self.scripts.append("".join(self.current))
+                      self.in_script = False
+
+          source = Path("index.html").read_text(encoding="utf-8")
+          parser = ScriptExtractor()
+          parser.feed(source)
+
+          duplicates = sorted({item for item in parser.ids if parser.ids.count(item) > 1})
+          if duplicates:
+              raise SystemExit("Duplicate HTML id values: " + ", ".join(duplicates))
+          if not parser.scripts:
+              raise SystemExit("No inline JavaScript found in index.html")
+
+          Path("/tmp/token-manager-inline.js").write_text(
+              "\n;\n".join(parser.scripts), encoding="utf-8"
+          )
+
+          required = [
+              "token-manager-api",
+              'action:"login"',
+              "Password Akses Internal",
+              "sessionStorage",
+              'Authorization:"Bearer "+token',
+          ]
+          for marker in required:
+              if marker not in source:
+                  raise SystemExit("Missing required integration marker: " + marker)
+
+          forbidden = [
+              "FIREBASE_SERVICE_ACCOUNT_JSON",
+              "SUPABASE_SERVICE_ROLE_KEY",
+              "-----BEGIN PRIVATE KEY-----",
+          ]
+          for marker in forbidden:
+              if marker in source:
+                  raise SystemExit("Sensitive server credential marker found in frontend: " + marker)
+
+          if "username-login" in source or "loginUsername" in source:
+              raise SystemExit("Legacy username login is still present in frontend.")
+          if 'onclick="viewDevices(' in source or 'onclick="openEditModal(' in source:
+              raise SystemExit("Dynamic token data must not be interpolated into inline onclick handlers.")
+          if 'button.addEventListener("click",handler)' not in source:
+              raise SystemExit("Token action buttons must use DOM event listeners.")
+
+          print(f"HTML parsed; {len(parser.ids)} ids; {len(parser.scripts)} inline script(s).")
+          print("Password-only login, credential safeguards, and DOM event handlers passed.")
+          PY
+
+          node --check /tmp/token-manager-inline.js

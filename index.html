@@ -6,27 +6,7 @@
     <title>Admin Panel - Kelola Token Akses</title>
     
     <!-- Firebase SDK Modular CDN -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyCi7Tr4DDGvWg-a8Fd_tybUS7bBq0hrvaY",
-            authDomain: "summarypengiriman.firebaseapp.com",
-            projectId: "summarypengiriman",
-            storageBucket: "summarypengiriman.firebasestorage.app",
-            messagingSenderId: "726489838703",
-            appId: "1:726489838703:web:928fb059ecf661c44a499a"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
-        window.db = db;
-        window.fbModules = { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query };
-        
-        loadTokens();
-    </script>
+    
 
     <style>
         :root {
@@ -90,7 +70,7 @@
 </head>
 <body>
 
-    <div class="container">
+    <div id="loginPanel" class="container" style="max-width:420px;margin:8vh auto;"><h2>Login Token Manager</h2><label>Password Akses Internal</label><input id="loginPassword" type="password" autocomplete="current-password" placeholder="Masukkan password internal"><button class="btn" style="margin-top:14px;" onclick="loginTokenManager()">Masuk</button><div style="margin-top:10px;color:#718093;font-size:11px;">Khusus penggunaan internal. Sesi aktif selama 12 jam.</div><div id="loginMessage" style="margin-top:12px;color:#c0392b;font-size:12px;"></div></div><div id="managerPanel" style="display:none;"><div class="container"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><h2 style="flex:1;">Generator & Manajemen Token Akses</h2><button class="btn" style="width:auto;" onclick="logoutTokenManager()">Keluar</button></div>
         <h2>Generator & Manajemen Token Akses</h2>
         
         <div class="form-row">
@@ -158,7 +138,7 @@
 
         <h3 style="margin-top: 25px;">Daftar Token Terdaftar</h3>
         <div id="tokenContainer" class="token-list"></div>
-    </div>
+    </div></div>
 
     <!-- Modal Pop-Up Hari Khusus -->
     <div id="modalDays" class="modal-overlay">
@@ -239,218 +219,68 @@
     </div>
 
     <script>
-        let customDaysData = { 'start': [], 'end': [], 'edit-start': [], 'edit-end': [] };
-        let activeDayContext = ''; 
-        let activeSelectElement = null;
-
-        function toggleScheduleUI(containerId, isChecked) {
-            document.getElementById(containerId).className = isChecked ? 'schedule-box active' : 'schedule-box';
-        }
-
-        function handleDaySelect(selectElement, context) {
-            if (selectElement.value === 'khusus') {
-                activeDayContext = context;
-                activeSelectElement = selectElement;
-                
-                let savedDays = customDaysData[context] || [];
-                document.querySelectorAll('.chk-day').forEach(chk => {
-                    chk.checked = savedDays.includes(parseInt(chk.value));
-                });
-                
-                document.getElementById('modalDaysTitle').innerText = `Pilih Hari Khusus (${context.includes('start') ? 'Mulai' : 'Mati'})`;
-                document.getElementById('modalDays').style.display = 'flex';
-            }
-        }
-
-        function closeModalDays(isSave) {
-            if (isSave) {
-                let selected = [];
-                document.querySelectorAll('.chk-day:checked').forEach(chk => selected.push(parseInt(chk.value)));
-                if (selected.length === 0) {
-                    alert("Minimal pilih 1 hari!");
-                    return;
-                }
-                customDaysData[activeDayContext] = selected;
-            } else {
-                if (activeSelectElement && (!customDaysData[activeDayContext] || customDaysData[activeDayContext].length === 0)) {
-                    activeSelectElement.value = 'tiap_hari';
-                }
-            }
-            document.getElementById('modalDays').style.display = 'none';
-        }
-
-        function buildScheduleObject(prefix = '') {
-            let toggle = document.getElementById(prefix ? 'edit-toggleSchedule' : 'toggleSchedule').checked;
-            if (!toggle) return { isScheduled: false };
-            
-            return {
-                isScheduled: true,
-                createdAt: new Date().toISOString(),
-                start: {
-                    time: document.getElementById(prefix + 'start-time').value,
-                    type: document.getElementById(prefix + 'start-day').value,
-                    days: customDaysData[prefix ? 'edit-start' : 'start'] || []
-                },
-                end: {
-                    time: document.getElementById(prefix + 'end-time').value,
-                    type: document.getElementById(prefix + 'end-day').value,
-                    days: customDaysData[prefix ? 'edit-end' : 'end'] || []
-                }
-            };
-        }
-
-        async function loadTokens() {
-            const { collection, getDocs, query } = window.fbModules;
-            let container = document.getElementById('tokenContainer');
-            container.innerHTML = `<div style="text-align: center; font-style: italic; color: #718093;">Memuat data...</div>`;
-
-            try {
-                const q = query(collection(window.db, "access_tokens"));
-                const querySnapshot = await getDocs(q);
-                
-                container.innerHTML = '';
-                if (querySnapshot.empty) {
-                    container.innerHTML = `<div style="text-align: center; color: #718093; font-style: italic;">Belum ada token.</div>`;
-                    return;
-                }
-
-                querySnapshot.forEach((docSnap) => {
-                    let data = docSnap.data();
-                    let docId = docSnap.id;
-                    let registered = data.registeredDevices || [];
-                    let maxDev = data.maxDevices || 1;
-                    
-                    let scheduleText = "Tanpa Jadwal (Bebas)";
-                    if (data.schedule && data.schedule.isScheduled) {
-                        scheduleText = `Aktif: ${data.schedule.start.time} - ${data.schedule.end.time} (${data.schedule.start.type})`;
-                    }
-
-                    let statusBadge = data.active ? `<span class="badge-active">AKTIF</span>` : `<span class="badge-inactive">NONAKTIF</span>`;
-                    let itemDiv = document.createElement('div');
-                    itemDiv.className = 'token-item';
-                    
-                    let rawData = encodeURIComponent(JSON.stringify(data));
-                    let devicesJson = encodeURIComponent(JSON.stringify(registered));
-
-                    itemDiv.innerHTML = `
-                        <div style="display:flex; flex-direction:column; gap:4px;">
-                            <strong>${data.nama}</strong>
-                            <code style="background: #e2e8f0; padding: 2px 5px; border-radius: 3px; font-weight: bold; color: var(--primary); width: fit-content;">${data.token}</code>
-                            <div style="font-size: 10px; color: #7f8c8d;">Terhubung: ${registered.length} / ${maxDev} Perangkat</div>
-                            <div style="font-size: 10px; color: var(--info); font-weight:bold;">⏱️ ${scheduleText}</div>
-                        </div>
-                        <div class="btn-group">
-                            ${statusBadge}
-                            <button class="btn-sm btn-info" onclick="viewDevices('${devicesJson}')">Lihat</button>
-                            <button class="btn-sm btn-toggle" onclick="resetDevices('${docId}')">Reset</button>
-                            <button class="btn-sm btn-edit" onclick="openEditModal('${docId}', '${rawData}')">Edit</button>
-                            <button class="btn-sm btn-info" onclick="toggleTokenStatus('${docId}', ${data.active})">${data.active ? 'Matikan' : 'Nyalakan'}</button>
-                            <button class="btn-sm btn-del" onclick="deleteToken('${docId}')">Hapus</button>
-                        </div>
-                    `;
-                    container.appendChild(itemDiv);
-                });
-            } catch (e) { console.error(e); }
-        }
-
-        window.viewDevices = function(devicesJson) {
-            let devices = JSON.parse(decodeURIComponent(devicesJson));
-            let bodyDiv = document.getElementById('deviceModalBody');
-            bodyDiv.innerHTML = '';
-            
-            if (devices.length === 0) {
-                bodyDiv.innerHTML = `<div style="text-align: center; color: #718093; font-style: italic; padding: 15px;">Belum ada perangkat yang terhubung ke token ini.</div>`;
-            } else {
-                let listHtml = '<ul style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px;">';
-                devices.forEach((id) => {
-                    listHtml += `<li><code style="background: #e2e8f0; padding: 3px 6px; border-radius: 3px; font-weight: bold; color: var(--primary);">${id}</code></li>`;
-                });
-                listHtml += '</ul>';
-                bodyDiv.innerHTML = listHtml;
-            }
-            document.getElementById('modalDevices').style.display = 'flex';
-        }
-
-        window.saveToken = async function() {
-            let nama = document.getElementById('inputNama').value.trim();
-            let token = document.getElementById('inputToken').value.trim().toUpperCase();
-            let maxDevices = parseInt(document.getElementById('inputMaxDevices').value) || 1;
-
-            if (!nama || !token) { alert("Nama dan Kode wajib diisi!"); return; }
-
-            let schedule = buildScheduleObject();
-
-            try {
-                const { collection, addDoc } = window.fbModules;
-                await addDoc(collection(window.db, "access_tokens"), {
-                    nama: nama,
-                    token: token,
-                    active: true,
-                    maxDevices: maxDevices,
-                    registeredDevices: [],
-                    schedule: schedule
-                });
-                alert("Token berhasil dibuat!");
-                location.reload();
-            } catch (e) { alert("Gagal menyimpan."); }
-        }
-
-        window.openEditModal = function(docId, rawData) {
-            let data = JSON.parse(decodeURIComponent(rawData));
-            document.getElementById('edit-docId').value = docId;
-            document.getElementById('edit-maxDevices').value = data.maxDevices || 1;
-            
-            let isSched = data.schedule && data.schedule.isScheduled;
-            document.getElementById('edit-toggleSchedule').checked = isSched;
-            toggleScheduleUI('edit-scheduleContainer', isSched);
-
-            if (isSched) {
-                document.getElementById('edit-start-time').value = data.schedule.start.time;
-                document.getElementById('edit-start-day').value = data.schedule.start.type;
-                customDaysData['edit-start'] = data.schedule.start.days || [];
-                
-                document.getElementById('edit-end-time').value = data.schedule.end.time;
-                document.getElementById('edit-end-day').value = data.schedule.end.type;
-                customDaysData['edit-end'] = data.schedule.end.days || [];
-            }
-            document.getElementById('modalEdit').style.display = 'flex';
-        }
-
-        window.updateTokenData = async function() {
-            let docId = document.getElementById('edit-docId').value;
-            let maxDevices = parseInt(document.getElementById('edit-maxDevices').value) || 1;
-            let schedule = buildScheduleObject('edit-');
-
-            try {
-                const { doc, updateDoc } = window.fbModules;
-                await updateDoc(doc(window.db, "access_tokens", docId), {
-                    maxDevices: maxDevices,
-                    schedule: schedule
-                });
-                document.getElementById('modalEdit').style.display = 'none';
-                loadTokens();
-            } catch (e) { alert("Gagal update."); }
-        }
-
-        window.toggleTokenStatus = async function(docId, currentStatus) {
-            const { doc, updateDoc } = window.fbModules;
-            await updateDoc(doc(window.db, "access_tokens", docId), { active: !currentStatus });
-            loadTokens();
-        }
-
-        window.resetDevices = async function(docId) {
-            if(!confirm("Keluarkan semua perangkat dari token ini?")) return;
-            const { doc, updateDoc } = window.fbModules;
-            await updateDoc(doc(window.db, "access_tokens", docId), { registeredDevices: [] });
-            loadTokens();
-        }
-
-        window.deleteToken = async function(docId) {
-            if(!confirm("Hapus permanen?")) return;
-            const { doc, deleteDoc } = window.fbModules;
-            await deleteDoc(doc(window.db, "access_tokens", docId));
-            loadTokens();
-        }
-    </script>
+const SUPABASE_URL="https://wcsjjdzxnwhzqkqninky.supabase.co";
+const SUPABASE_ANON_KEY="sb_publishable_UadEwYUBc9Whu3m7VKrF6g_lAjS_Y4U";
+let assemblySession=null;
+let customDaysData={start:[],end:[],"edit-start":[],"edit-end":[]};
+let activeDayContext="",activeSelectElement=null;
+async function callFn(name,payload,token){
+ const r=await fetch(SUPABASE_URL+"/functions/v1/"+name,{method:"POST",headers:{"Content-Type":"application/json","apikey":SUPABASE_ANON_KEY,...(token?{Authorization:"Bearer "+token}:{})},body:JSON.stringify(payload)});
+ const d=await r.json().catch(()=>({}));
+ if(!r.ok)throw new Error(d.error||"Permintaan gagal ("+r.status+")");return d;
+}
+window.loginTokenManager=async function(){
+ const msg=document.getElementById("loginMessage"),password=document.getElementById("loginPassword").value;
+ msg.textContent="Memeriksa password...";
+ try{
+  await callFn("token-manager-api",{action:"login",password});
+  assemblySession={access_token:password,expires_at:Date.now()+12*60*60*1000};
+  sessionStorage.setItem("tokenManagerSession",JSON.stringify(assemblySession));
+  document.getElementById("loginPassword").value="";await showManager();
+ }catch(e){msg.textContent=e.message;}
+};
+async function showManager(){document.getElementById("loginPanel").style.display="none";document.getElementById("managerPanel").style.display="block";await loadTokens();}
+window.logoutTokenManager=function(){assemblySession=null;sessionStorage.removeItem("tokenManagerSession");document.getElementById("managerPanel").style.display="none";document.getElementById("loginPanel").style.display="block";document.getElementById("loginMessage").textContent="";document.getElementById("loginPassword").value="";};
+async function api(action,values={}){
+ if(!assemblySession?.access_token||!assemblySession.expires_at||Date.now()>=assemblySession.expires_at){
+  logoutTokenManager();throw new Error("Sesi 12 jam berakhir. Masukkan password kembali.");
+ }
+ try{return await callFn("token-manager-api",{action,...values},assemblySession.access_token);}
+ catch(e){if(/Password salah|sesi tidak valid/i.test(e.message))logoutTokenManager();throw e;}
+}
+function toggleScheduleUI(id,on){document.getElementById(id).className=on?"schedule-box active":"schedule-box";}
+function handleDaySelect(el,ctx){if(el.value!=="khusus")return;activeDayContext=ctx;activeSelectElement=el;document.querySelectorAll(".chk-day").forEach(c=>c.checked=(customDaysData[ctx]||[]).includes(+c.value));document.getElementById("modalDaysTitle").innerText="Pilih Hari Khusus ("+(ctx.includes("start")?"Mulai":"Mati")+")";document.getElementById("modalDays").style.display="flex";}
+function closeModalDays(save){if(save){const a=[...document.querySelectorAll(".chk-day:checked")].map(c=>+c.value);if(!a.length){alert("Minimal pilih 1 hari!");return;}customDaysData[activeDayContext]=a;}else if(activeSelectElement&&!(customDaysData[activeDayContext]||[]).length)activeSelectElement.value="tiap_hari";document.getElementById("modalDays").style.display="none";}
+function buildScheduleObject(prefix=""){const edit=!!prefix;if(!document.getElementById(prefix+"toggleSchedule").checked)return{isScheduled:false};return{isScheduled:true,createdAt:new Date().toISOString(),start:{time:document.getElementById(prefix+"start-time").value,type:document.getElementById(prefix+"start-day").value,days:customDaysData[edit?"edit-start":"start"]||[]},end:{time:document.getElementById(prefix+"end-time").value,type:document.getElementById(prefix+"end-day").value,days:customDaysData[edit?"edit-end":"end"]||[]}};}
+async function loadTokens(){
+ const box=document.getElementById("tokenContainer");box.textContent="Memuat data...";
+ try{const d=await api("list"),tokens=d.tokens||[];box.innerHTML="";if(!tokens.length){box.textContent="Belum ada token.";return;}
+ tokens.forEach(x=>{
+  const dev=Array.isArray(x.registeredDevices)?x.registeredDevices:[],sched=x.schedule?.isScheduled?"Aktif: "+x.schedule.start.time+" - "+x.schedule.end.time+" ("+x.schedule.start.type+")":"Tanpa Jadwal (Bebas)";
+  const el=document.createElement("div");el.className="token-item";
+  el.innerHTML='<div class="token-info" style="display:flex;flex-direction:column;gap:4px;min-width:0;"><strong></strong><code></code><div class="device-count" style="font-size:10px;color:#7f8c8d;"></div><div class="schedule-text" style="font-size:10px;color:var(--info);font-weight:bold;"></div></div><div class="btn-group"></div>';
+  el.querySelector("strong").textContent=x.nama||"(Tanpa nama)";el.querySelector("code").textContent=x.token||"";
+  el.querySelector(".device-count").textContent="Terhubung: "+dev.length+" / "+(x.maxDevices||1)+" Perangkat";el.querySelector(".schedule-text").textContent="⏱ "+sched;
+  const actions=el.querySelector(".btn-group");
+  const status=document.createElement("span");status.className=x.active?"badge-active":"badge-inactive";status.textContent=x.active?"AKTIF":"NONAKTIF";actions.appendChild(status);
+  const addAction=(label,cls,handler)=>{const button=document.createElement("button");button.type="button";button.className="btn-sm "+cls;button.textContent=label;button.addEventListener("click",handler);actions.appendChild(button);};
+  addAction("Lihat","btn-info",()=>viewDevices(dev));
+  addAction("Reset","btn-toggle",()=>resetDevices(x.id));
+  addAction("Edit","btn-edit",()=>openEditModal(x.id,x));
+  addAction(x.active?"Matikan":"Nyalakan","btn-info",()=>toggleTokenStatus(x.id));
+  addAction("Hapus","btn-del",()=>deleteToken(x.id));
+  box.appendChild(el);
+ });
+ }catch(e){box.textContent="Gagal memuat token: "+e.message;}
+}
+window.viewDevices=function(devices){const a=Array.isArray(devices)?devices:[],b=document.getElementById("deviceModalBody");b.innerHTML="";if(!a.length)b.textContent="Belum ada perangkat yang terhubung.";else{const ul=document.createElement("ul");a.forEach(v=>{const li=document.createElement("li");li.textContent=String(v);ul.appendChild(li);});b.appendChild(ul);}document.getElementById("modalDevices").style.display="flex";};
+window.saveToken=async function(){const nama=document.getElementById("inputNama").value.trim(),token=document.getElementById("inputToken").value.trim().toUpperCase(),maxDevices=parseInt(document.getElementById("inputMaxDevices").value,10);if(!nama||!token||!Number.isInteger(maxDevices)||maxDevices<1){alert("Lengkapi nama, kode token, dan batas HP minimal 1.");return;}try{await api("create",{nama,token,maxDevices,schedule:buildScheduleObject()});alert("Token berhasil dibuat!");document.getElementById("inputNama").value="";document.getElementById("inputToken").value="";await loadTokens();}catch(e){alert(e.message);}};
+window.openEditModal=function(id,d){document.getElementById("edit-docId").value=id;document.getElementById("edit-maxDevices").value=d.maxDevices||1;const on=!!d.schedule?.isScheduled;document.getElementById("edit-toggleSchedule").checked=on;toggleScheduleUI("edit-scheduleContainer",on);if(on){document.getElementById("edit-start-time").value=d.schedule.start.time;document.getElementById("edit-start-day").value=d.schedule.start.type;customDaysData["edit-start"]=d.schedule.start.days||[];document.getElementById("edit-end-time").value=d.schedule.end.time;document.getElementById("edit-end-day").value=d.schedule.end.type;customDaysData["edit-end"]=d.schedule.end.days||[];}else{customDaysData["edit-start"]=[];customDaysData["edit-end"]=[];}document.getElementById("modalEdit").style.display="flex";};
+window.updateTokenData=async function(){const docId=document.getElementById("edit-docId").value,maxDevices=parseInt(document.getElementById("edit-maxDevices").value,10);if(!Number.isInteger(maxDevices)||maxDevices<1){alert("Batas perangkat minimal 1.");return;}try{await api("update",{docId,maxDevices,schedule:buildScheduleObject("edit-")});document.getElementById("modalEdit").style.display="none";await loadTokens();}catch(e){alert(e.message);}};
+window.toggleTokenStatus=async id=>{try{await api("toggle",{docId:id});await loadTokens();}catch(e){alert(e.message);}};
+window.resetDevices=async id=>{if(!confirm("Keluarkan semua perangkat dari token ini?"))return;try{await api("reset",{docId:id});await loadTokens();}catch(e){alert(e.message);}};
+window.deleteToken=async id=>{if(!confirm("Hapus permanen?"))return;try{await api("delete",{docId:id});await loadTokens();}catch(e){alert(e.message);}};
+(function(){try{const s=JSON.parse(sessionStorage.getItem("tokenManagerSession")||"null");if(s?.access_token&&s?.expires_at>Date.now()){assemblySession=s;showManager().catch(e=>{document.getElementById("tokenContainer").textContent=e.message;});}else{sessionStorage.removeItem("tokenManagerSession");}}catch(_){sessionStorage.removeItem("tokenManagerSession");}})();
+</script>
 </body>
 </html>
