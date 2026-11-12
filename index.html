@@ -462,8 +462,8 @@
 
         window.loadTokens = loadTokens;
 
-        const INTERNAL_PASSWORD_SALT = "7d2b841abf9e6c0d55aa837be2391c4f";
-        const INTERNAL_PASSWORD_HASH = "4bb9b6425b01a937fe0aa3f9b946e886e973aa5d1f797678026d06f6266658c0";
+        const INTERNAL_PASSWORD_SALT = "ea6bac4dd6969fbf028dabe1495900d5";
+        const INTERNAL_PASSWORD_HASH = "f76d0a08c1b4019872a6611442cbfdf99c9ef3711df4a607a936b8eccc39da10";
 
         async function verifyInternalPassword(password) {
             const toBytes = hex => new Uint8Array(hex.match(/.{2}/g).map(v => parseInt(v, 16)));
