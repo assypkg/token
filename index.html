@@ -70,7 +70,7 @@
 </head>
 <body>
 
-    <div id="loginPanel" class="container" style="max-width:420px;margin:8vh auto;"><h2>Login Token Manager</h2><label>Username</label><input id="loginUsername" autocomplete="username" placeholder="Username"><label style="margin-top:12px;">Password</label><input id="loginPassword" type="password" autocomplete="current-password" placeholder="Password"><button class="btn" style="margin-top:14px;" onclick="loginTokenManager()">Masuk</button><div id="loginMessage" style="margin-top:12px;color:#c0392b;font-size:12px;"></div></div><div id="managerPanel" style="display:none;"><div class="container"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><h2 style="flex:1;">Generator & Manajemen Token Akses</h2><button class="btn" style="width:auto;" onclick="logoutTokenManager()">Keluar</button></div>
+    <div id="loginPanel" class="container" style="max-width:420px;margin:8vh auto;"><h2>Login Token Manager</h2><label>Password Akses Internal</label><input id="loginPassword" type="password" autocomplete="current-password" placeholder="Masukkan password internal"><button class="btn" style="margin-top:14px;" onclick="loginTokenManager()">Masuk</button><div style="margin-top:10px;color:#718093;font-size:11px;">Khusus penggunaan internal. Sesi aktif selama 12 jam.</div><div id="loginMessage" style="margin-top:12px;color:#c0392b;font-size:12px;"></div></div><div id="managerPanel" style="display:none;"><div class="container"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><h2 style="flex:1;">Generator & Manajemen Token Akses</h2><button class="btn" style="width:auto;" onclick="logoutTokenManager()">Keluar</button></div>
         <h2>Generator & Manajemen Token Akses</h2>
         
         <div class="form-row">
@@ -230,17 +230,16 @@ async function callFn(name,payload,token){
  if(!r.ok)throw new Error(d.error||"Permintaan gagal ("+r.status+")");return d;
 }
 window.loginTokenManager=async function(){
- const msg=document.getElementById("loginMessage");msg.textContent="Memeriksa akun...";
+ const msg=document.getElementById("loginMessage");msg.textContent="Memeriksa password...";
  try{
-  const d=await callFn("username-login",{username:document.getElementById("loginUsername").value.trim(),password:document.getElementById("loginPassword").value});
-  if(d.profile?.role!=="superuser")throw new Error("Akses ditolak. Hanya superuser yang dapat menggunakan Token Manager.");
-  assemblySession={access_token:d.access_token,refresh_token:d.refresh_token,profile:d.profile};
+  const d=await callFn("token-manager-api",{action:"login",password:document.getElementById("loginPassword").value});
+  assemblySession={access_token:d.session_token};
   sessionStorage.setItem("tokenManagerSession",JSON.stringify(assemblySession));
   document.getElementById("loginPassword").value="";await showManager();
  }catch(e){msg.textContent=e.message;}
 };
 async function showManager(){document.getElementById("loginPanel").style.display="none";document.getElementById("managerPanel").style.display="block";await loadTokens();}
-window.logoutTokenManager=function(){assemblySession=null;sessionStorage.removeItem("tokenManagerSession");document.getElementById("managerPanel").style.display="none";document.getElementById("loginPanel").style.display="block";document.getElementById("loginMessage").textContent="";document.getElementById("loginUsername").value="";document.getElementById("loginPassword").value="";};
+window.logoutTokenManager=function(){assemblySession=null;sessionStorage.removeItem("tokenManagerSession");document.getElementById("managerPanel").style.display="none";document.getElementById("loginPanel").style.display="block";document.getElementById("loginMessage").textContent="";document.getElementById("loginPassword").value="";};
 async function api(action,values={}){if(!assemblySession?.access_token)throw new Error("Sesi login berakhir. Silakan login kembali.");return await callFn("token-manager-api",{action,...values},assemblySession.access_token);}
 function toggleScheduleUI(id,on){document.getElementById(id).className=on?"schedule-box active":"schedule-box";}
 function handleDaySelect(el,ctx){if(el.value!=="khusus")return;activeDayContext=ctx;activeSelectElement=el;document.querySelectorAll(".chk-day").forEach(c=>c.checked=(customDaysData[ctx]||[]).includes(+c.value));document.getElementById("modalDaysTitle").innerText="Pilih Hari Khusus ("+(ctx.includes("start")?"Mulai":"Mati")+")";document.getElementById("modalDays").style.display="flex";}
@@ -274,7 +273,7 @@ window.updateTokenData=async function(){const docId=document.getElementById("edi
 window.toggleTokenStatus=async id=>{try{await api("toggle",{docId:id});await loadTokens();}catch(e){alert(e.message);}};
 window.resetDevices=async id=>{if(!confirm("Keluarkan semua perangkat dari token ini?"))return;try{await api("reset",{docId:id});await loadTokens();}catch(e){alert(e.message);}};
 window.deleteToken=async id=>{if(!confirm("Hapus permanen?"))return;try{await api("delete",{docId:id});await loadTokens();}catch(e){alert(e.message);}};
-(function(){try{const s=JSON.parse(sessionStorage.getItem("tokenManagerSession")||"null");if(s?.access_token&&s.profile?.role==="superuser"){assemblySession=s;showManager().catch(e=>{document.getElementById("tokenContainer").textContent=e.message;});}}catch(_){sessionStorage.removeItem("tokenManagerSession");}})();
+(function(){try{const s=JSON.parse(sessionStorage.getItem("tokenManagerSession")||"null");if(s?.access_token){assemblySession=s;showManager().catch(e=>{document.getElementById("tokenContainer").textContent=e.message;});}}catch(_){sessionStorage.removeItem("tokenManagerSession");}})();
 </script>
 </body>
 </html>
