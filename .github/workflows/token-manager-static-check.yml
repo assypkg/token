@@ -18,7 +18,7 @@ jobs:
         with:
           node-version: 22
 
-      - name: Smoke test deployed Supabase endpoints (read-only)
+      - name: Smoke test internal-password backend (read-only)
         env:
           SUPABASE_URL: https://wcsjjdzxnwhzqkqninky.supabase.co
           SUPABASE_ANON_KEY: sb_publishable_UadEwYUBc9Whu3m7VKrF6g_lAjS_Y4U
@@ -30,52 +30,40 @@ jobs:
           import urllib.error
           import urllib.request
 
-          base = os.environ["SUPABASE_URL"].rstrip("/") + "/functions/v1/"
-          public_key = os.environ["SUPABASE_ANON_KEY"]
-          origin = os.environ["EXPECTED_ORIGIN"]
+          base = os.environ["SUPABASE_URL"].rstrip("/") + "/functions/v1/token-manager-api"
+          headers = {
+              "apikey": os.environ["SUPABASE_ANON_KEY"],
+              "Origin": os.environ["EXPECTED_ORIGIN"],
+              "Content-Type": "application/json",
+          }
 
-          def request(path, method="POST", payload=None, bearer=None):
-              headers = {
-                  "apikey": public_key,
-                  "Origin": origin,
-                  "Content-Type": "application/json",
-              }
+          def request(payload=None, bearer=None, method="POST"):
+              h = dict(headers)
               if bearer:
-                  headers["Authorization"] = "Bearer " + bearer
+                  h["Authorization"] = "Bearer " + bearer
               data = None if payload is None else json.dumps(payload).encode()
-              req = urllib.request.Request(base + path, data=data, headers=headers, method=method)
+              req = urllib.request.Request(base, data=data, headers=h, method=method)
               try:
                   with urllib.request.urlopen(req, timeout=20) as response:
                       return response.status, response.headers, response.read().decode()
               except urllib.error.HTTPError as error:
                   return error.code, error.headers, error.read().decode()
 
-          for endpoint in ("username-login", "token-manager-api"):
-              status, headers, _ = request(
-                  endpoint, "OPTIONS",
-                  payload=None
-              )
-              if status != 200 or headers.get("Access-Control-Allow-Origin") != origin:
-                  raise SystemExit(f"CORS preflight failed for {endpoint}: HTTP {status}")
+          status, response_headers, _ = request(method="OPTIONS")
+          if status != 200 or response_headers.get("Access-Control-Allow-Origin") != headers["Origin"]:
+              raise SystemExit(f"CORS preflight failed: HTTP {status}")
 
-          status, _, body = request(
-              "username-login",
-              payload={"username": "__healthcheck__", "password": "Invalid-Healthcheck-Password"},
-          )
-          if status != 401 or "Username atau password salah." not in body:
-              raise SystemExit(f"Login endpoint smoke test unexpected: HTTP {status}; body={body[:300]}")
+          status, _, body = request(payload={"action": "login", "password": "invalid-health-check-password"})
+          if status != 401 or "Password salah." not in body:
+              raise SystemExit(f"Password login guard unexpected: HTTP {status}; body={body[:300]}")
 
-          status, _, body = request(
-              "token-manager-api",
-              payload={"action": "list"},
-              bearer="invalid-smoke-test-session",
-          )
-          if status != 401 or "Sesi login tidak valid" not in body:
-              raise SystemExit(f"Token API auth guard smoke test unexpected: HTTP {status}; body={body[:300]}")
+          status, _, body = request(payload={"action": "list"}, bearer="invalid-smoke-test-session")
+          if status != 401 or "Sesi berakhir atau tidak valid." not in body:
+              raise SystemExit(f"Session validation unexpected: HTTP {status}; body={body[:300]}")
 
-          print("CORS preflight passed for both endpoints.")
-          print("Username login endpoint responds with expected invalid-credential rejection.")
-          print("Token Manager API rejects an invalid bearer session.")
+          print("CORS preflight passed.")
+          print("Invalid internal password is rejected.")
+          print("Invalid session token is rejected.")
           PY
 
       - name: Validate inline JavaScript and integration safeguards
@@ -117,7 +105,6 @@ jobs:
           duplicates = sorted({item for item in parser.ids if parser.ids.count(item) > 1})
           if duplicates:
               raise SystemExit("Duplicate HTML id values: " + ", ".join(duplicates))
-
           if not parser.scripts:
               raise SystemExit("No inline JavaScript found in index.html")
 
@@ -126,10 +113,10 @@ jobs:
           )
 
           required = [
-              "username-login",
               "token-manager-api",
+              'action:"login"',
+              "Password Akses Internal",
               "sessionStorage",
-              'role!=="superuser"',
               'Authorization:"Bearer "+token',
           ]
           for marker in required:
@@ -145,13 +132,15 @@ jobs:
               if marker in source:
                   raise SystemExit("Sensitive server credential marker found in frontend: " + marker)
 
-          print(f"HTML parsed; {len(parser.ids)} ids; {len(parser.scripts)} inline script(s).")
+          if "username-login" in source or "loginUsername" in source:
+              raise SystemExit("Legacy username login is still present in frontend.")
           if 'onclick="viewDevices(' in source or 'onclick="openEditModal(' in source:
               raise SystemExit("Dynamic token data must not be interpolated into inline onclick handlers.")
           if 'button.addEventListener("click",handler)' not in source:
               raise SystemExit("Token action buttons must use DOM event listeners.")
 
-          print("Integration markers, credential safeguards, and safe DOM event handlers passed.")
+          print(f"HTML parsed; {len(parser.ids)} ids; {len(parser.scripts)} inline script(s).")
+          print("Password-only login, credential safeguards, and DOM event handlers passed.")
           PY
 
           node --check /tmp/token-manager-inline.js
