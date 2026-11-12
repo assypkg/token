@@ -24,7 +24,6 @@ jobs:
           python3 - <<'PY'
           from html.parser import HTMLParser
           from pathlib import Path
-          import re
 
           class ScriptExtractor(HTMLParser):
               def __init__(self):
@@ -63,13 +62,13 @@ jobs:
               raise SystemExit("No inline JavaScript found in index.html")
 
           Path("/tmp/token-manager-inline.js").write_text(
-              "\\n;\\n".join(parser.scripts), encoding="utf-8"
+              "\n;\n".join(parser.scripts), encoding="utf-8"
           )
 
           required = [
-              'username-login',
-              'token-manager-api',
-              'sessionStorage',
+              "username-login",
+              "token-manager-api",
+              "sessionStorage",
               'role!=="superuser"',
               'Authorization:"Bearer "+token',
           ]
