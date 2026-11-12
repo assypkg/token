@@ -86,7 +86,12 @@ jobs:
                   raise SystemExit("Sensitive server credential marker found in frontend: " + marker)
 
           print(f"HTML parsed; {len(parser.ids)} ids; {len(parser.scripts)} inline script(s).")
-          print("Integration markers and frontend credential safeguards passed.")
+          if 'onclick="viewDevices(' in source or 'onclick="openEditModal(' in source:
+              raise SystemExit("Dynamic token data must not be interpolated into inline onclick handlers.")
+          if 'button.addEventListener("click",handler)' not in source:
+              raise SystemExit("Token action buttons must use DOM event listeners.")
+
+          print("Integration markers, credential safeguards, and safe DOM event handlers passed.")
           PY
 
           node --check /tmp/token-manager-inline.js
