@@ -230,17 +230,24 @@ async function callFn(name,payload,token){
  if(!r.ok)throw new Error(d.error||"Permintaan gagal ("+r.status+")");return d;
 }
 window.loginTokenManager=async function(){
- const msg=document.getElementById("loginMessage");msg.textContent="Memeriksa password...";
+ const msg=document.getElementById("loginMessage"),password=document.getElementById("loginPassword").value;
+ msg.textContent="Memeriksa password...";
  try{
-  const d=await callFn("token-manager-api",{action:"login",password:document.getElementById("loginPassword").value});
-  assemblySession={access_token:d.session_token};
+  await callFn("token-manager-api",{action:"login",password});
+  assemblySession={access_token:password,expires_at:Date.now()+12*60*60*1000};
   sessionStorage.setItem("tokenManagerSession",JSON.stringify(assemblySession));
   document.getElementById("loginPassword").value="";await showManager();
  }catch(e){msg.textContent=e.message;}
 };
 async function showManager(){document.getElementById("loginPanel").style.display="none";document.getElementById("managerPanel").style.display="block";await loadTokens();}
 window.logoutTokenManager=function(){assemblySession=null;sessionStorage.removeItem("tokenManagerSession");document.getElementById("managerPanel").style.display="none";document.getElementById("loginPanel").style.display="block";document.getElementById("loginMessage").textContent="";document.getElementById("loginPassword").value="";};
-async function api(action,values={}){if(!assemblySession?.access_token)throw new Error("Sesi login berakhir. Silakan login kembali.");return await callFn("token-manager-api",{action,...values},assemblySession.access_token);}
+async function api(action,values={}){
+ if(!assemblySession?.access_token||!assemblySession.expires_at||Date.now()>=assemblySession.expires_at){
+  logoutTokenManager();throw new Error("Sesi 12 jam berakhir. Masukkan password kembali.");
+ }
+ try{return await callFn("token-manager-api",{action,...values},assemblySession.access_token);}
+ catch(e){if(/Password salah|sesi tidak valid/i.test(e.message))logoutTokenManager();throw e;}
+}
 function toggleScheduleUI(id,on){document.getElementById(id).className=on?"schedule-box active":"schedule-box";}
 function handleDaySelect(el,ctx){if(el.value!=="khusus")return;activeDayContext=ctx;activeSelectElement=el;document.querySelectorAll(".chk-day").forEach(c=>c.checked=(customDaysData[ctx]||[]).includes(+c.value));document.getElementById("modalDaysTitle").innerText="Pilih Hari Khusus ("+(ctx.includes("start")?"Mulai":"Mati")+")";document.getElementById("modalDays").style.display="flex";}
 function closeModalDays(save){if(save){const a=[...document.querySelectorAll(".chk-day:checked")].map(c=>+c.value);if(!a.length){alert("Minimal pilih 1 hari!");return;}customDaysData[activeDayContext]=a;}else if(activeSelectElement&&!(customDaysData[activeDayContext]||[]).length)activeSelectElement.value="tiap_hari";document.getElementById("modalDays").style.display="none";}
@@ -273,7 +280,7 @@ window.updateTokenData=async function(){const docId=document.getElementById("edi
 window.toggleTokenStatus=async id=>{try{await api("toggle",{docId:id});await loadTokens();}catch(e){alert(e.message);}};
 window.resetDevices=async id=>{if(!confirm("Keluarkan semua perangkat dari token ini?"))return;try{await api("reset",{docId:id});await loadTokens();}catch(e){alert(e.message);}};
 window.deleteToken=async id=>{if(!confirm("Hapus permanen?"))return;try{await api("delete",{docId:id});await loadTokens();}catch(e){alert(e.message);}};
-(function(){try{const s=JSON.parse(sessionStorage.getItem("tokenManagerSession")||"null");if(s?.access_token){assemblySession=s;showManager().catch(e=>{document.getElementById("tokenContainer").textContent=e.message;});}}catch(_){sessionStorage.removeItem("tokenManagerSession");}})();
+(function(){try{const s=JSON.parse(sessionStorage.getItem("tokenManagerSession")||"null");if(s?.access_token&&s?.expires_at>Date.now()){assemblySession=s;showManager().catch(e=>{document.getElementById("tokenContainer").textContent=e.message;});}else{sessionStorage.removeItem("tokenManagerSession");}}catch(_){sessionStorage.removeItem("tokenManagerSession");}})();
 </script>
 </body>
 </html>
