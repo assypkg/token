@@ -1,0 +1,93 @@
+name: Token Manager Static Check
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [supabase-auth-integration]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate inline JavaScript and integration safeguards
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          import re
+
+          class ScriptExtractor(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.in_script = False
+                  self.current = []
+                  self.scripts = []
+                  self.ids = []
+
+              def handle_starttag(self, tag, attrs):
+                  attrs = dict(attrs)
+                  if "id" in attrs:
+                      self.ids.append(attrs["id"])
+                  if tag == "script" and not attrs.get("src"):
+                      self.in_script = True
+                      self.current = []
+
+              def handle_data(self, data):
+                  if self.in_script:
+                      self.current.append(data)
+
+              def handle_endtag(self, tag):
+                  if tag == "script" and self.in_script:
+                      self.scripts.append("".join(self.current))
+                      self.in_script = False
+
+          source = Path("index.html").read_text(encoding="utf-8")
+          parser = ScriptExtractor()
+          parser.feed(source)
+
+          duplicates = sorted({item for item in parser.ids if parser.ids.count(item) > 1})
+          if duplicates:
+              raise SystemExit("Duplicate HTML id values: " + ", ".join(duplicates))
+
+          if not parser.scripts:
+              raise SystemExit("No inline JavaScript found in index.html")
+
+          Path("/tmp/token-manager-inline.js").write_text(
+              "\\n;\\n".join(parser.scripts), encoding="utf-8"
+          )
+
+          required = [
+              'username-login',
+              'token-manager-api',
+              'sessionStorage',
+              'role!=="superuser"',
+              'Authorization:"Bearer "+token',
+          ]
+          for marker in required:
+              if marker not in source:
+                  raise SystemExit("Missing required integration marker: " + marker)
+
+          forbidden = [
+              "FIREBASE_SERVICE_ACCOUNT_JSON",
+              "SUPABASE_SERVICE_ROLE_KEY",
+              "-----BEGIN PRIVATE KEY-----",
+          ]
+          for marker in forbidden:
+              if marker in source:
+                  raise SystemExit("Sensitive server credential marker found in frontend: " + marker)
+
+          print(f"HTML parsed; {len(parser.ids)} ids; {len(parser.scripts)} inline script(s).")
+          print("Integration markers and frontend credential safeguards passed.")
+          PY
+
+          node --check /tmp/token-manager-inline.js
